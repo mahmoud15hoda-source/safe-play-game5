@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>سلم وثعبان: اللعب بمسؤولية</title>
+<style>
+:root{--bg:#e6f3fb;--ink:#12355b;--c1:#ffffff;--c2:#cfeaf8;--up:#2e9e5b;--down:#e0483e;--gold:#f4b400;--card:#ffffff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Tahoma,"Segoe UI",Arial,sans-serif;min-height:100vh;display:flex;justify-content:center}
+#app{width:100%;max-width:760px;padding:14px}
+h1{font-size:1.5rem;margin:6px 0 4px;text-align:center}
+.sub{text-align:center;margin:0 0 12px;opacity:.8}
+.panel{background:var(--card);border-radius:16px;padding:16px;box-shadow:0 2px 0 rgba(18,53,91,.15)}
+.hidden{display:none!important}
+input{font:inherit;padding:10px 14px;border:2px solid var(--ink);border-radius:10px;width:100%;margin:10px 0}
+button{font:inherit;cursor:pointer;border:0;border-radius:12px;padding:11px 18px;background:var(--ink);color:#fff;font-weight:700}
+button:focus-visible,input:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+button:disabled{opacity:.45;cursor:default}
+.bar{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:10px;font-weight:700;flex-wrap:wrap}
+#board{display:grid;grid-template-columns:repeat(6,1fr);gap:4px;direction:ltr;margin-bottom:12px}
+.cell{aspect-ratio:1/1;border-radius:10px;position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;font-size:.72rem;text-align:center;line-height:1.15;padding:2px;overflow:hidden;direction:rtl}
+.cell.a{background:var(--c1)}.cell.b{background:var(--c2)}
+.cell .n{position:absolute;top:2px;left:4px;font-size:.65rem;opacity:.6}
+.cell.up{background:#d6f3e1;border:2px solid var(--up)}
+.cell.down{background:#fde0dd;border:2px solid var(--down)}
+.cell.end{background:var(--gold);font-weight:700}
+.cell .t{font-size:1.15rem}
+.cell small{font-size:.62rem}
+.pawn{position:absolute;bottom:0;right:2px;font-size:1.5rem;transition:transform .15s}
+.cell.cur{outline:3px solid var(--gold)}
+#dice{font-size:2.6rem;min-width:64px;text-align:center}
+.row{display:flex;align-items:center;justify-content:center;gap:14px}
+#q h2{font-size:1.1rem;margin:0 0 10px}
+.opt{display:block;width:100%;text-align:right;margin:6px 0;background:#eaf3fa;color:var(--ink);border:2px solid var(--ink)}
+.opt.ok{background:var(--up);color:#fff;border-color:var(--up)}
+.opt.no{background:var(--down);color:#fff;border-color:var(--down)}
+#info{margin-top:10px;padding:10px;border-radius:10px;background:#fff6d6;font-size:.95rem}
+#msg{text-align:center;min-height:1.4em;font-weight:700;margin:6px 0}
+.end-t{font-size:1.4rem;text-align:center;margin:6px 0}
+.stats{display:flex;justify-content:space-around;margin:12px 0;text-align:center}
+.stats b{display:block;font-size:1.6rem}
+@media (prefers-reduced-motion:reduce){.pawn{transition:none}}
+@media (max-width:480px){.cell{font-size:.6rem}.cell small{display:none}}
+</style>
+</head>
+<body>
+<div id="app">
+<h1>سلم وثعبان: اللعب بمسؤولية</h1>
+<p class="sub">الصف السادس الابتدائي - الوحدة الثانية - الدرس الأول</p>
+
+<section id="start" class="panel">
+<p>أجب عن الأسئلة لتتسلق السلالم وتتجنب ثعابين المخاطر. معك 3 قلوب، فاحرص عليها!</p>
+<label for="nm">اكتب اسمك:</label>
+<input id="nm" maxlength="20" autocomplete="off">
+<button id="go" style="width:100%">ابدأ اللعب</button>
+<p id="best" style="text-align:center;margin:10px 0 0"></p>
+</section>
+
+<section id="game" class="hidden">
+<div class="bar"><span id="who"></span><span>النقاط: <span id="sc">0</span></span><span id="hr"></span></div>
+<div id="board" aria-label="لوحة اللعبة"></div>
+<div id="msg" role="status"></div>
+<div class="row"><div id="dice" aria-live="polite">🎲</div><button id="roll">ارمِ النرد</button></div>
+<div id="q" class="panel hidden" style="margin-top:12px">
+<h2 id="qt"></h2><div id="qo"></div><div id="info" class="hidden"></div>
+<button id="nx" class="hidden" style="margin-top:10px">متابعة</button>
+</div>
+</section>
+
+<section id="end" class="panel hidden">
+<div class="end-t" id="et"></div>
+<div class="stats"><div><b id="e1">0</b>النقاط</div><div><b id="e2">0</b>إجابات صحيحة</div><div><b id="e3">0</b>أسئلة</div></div>
+<p id="eb" style="text-align:center"></p>
+<button id="again" style="width:100%">العب مرة أخرى</button>
+</section>
+</div>
+
+<script>
+/* ===== الأسئلة: يمكنك التعديل هنا =====
+ كل سؤال: [النص، [الاختيارات]، رقم الإجابة الصحيحة يبدأ من 0، معلومة بعد الإجابة] */
+const TF=["صح","غلط"];
+const QS=[
+["اللعب لساعات طويلة أمام الشاشة لا يؤثر على صحة العينين.",TF,1,"التركيز المستمر على الشاشة يسبب جفاف العين وتشوش الرؤية."],
+["الجلوس لفترات طويلة بوضعية خاطئة قد يسبب آلام الظهر والرقبة.",TF,0,"خذ فترات راحة منتظمة وعدّل جلستك."],
+["يجب أن تشارك معلوماتك الشخصية مع أي لاعب تتعرف عليه.",TF,1,"لا نشارك الاسم الكامل أو العنوان أو رقم الهاتف مع أحد لا نعرفه."],
+["ممارسة الرياضة تساعد على تجنب المخاطر الجسدية للألعاب.",TF,0,"النشاط البدني يوازن وقت الجلوس الطويل."],
+["عندما تشعر بالتوتر أو الغضب من اللعبة، من الأفضل أن تتوقف قليلًا.",TF,0,"الراحة تهدئك وتمنع المشاعر العدوانية."],
+["قضاء الوقت مع العائلة والأصدقاء أهم من قضاء كل الوقت في اللعب.",TF,0,"يجب أن نوازن بين اللعب والهوايات والأسرة."],
+["دور الأسرة هو منع الأبناء من اللعب نهائيًا.",TF,1,"دور الأسرة وضع قواعد واضحة والحوار والمشاركة في اختيار الألعاب."],
+["القلق والاكتئاب من المخاطر الجسدية للإفراط في الألعاب.",TF,1,"هي مخاطر نفسية، أما الجسدية فمثل آلام الظهر وإجهاد العين."],
+["الألعاب الإلكترونية تعتمد على عالم افتراضي وتفاعل بين اللاعب والجهاز.",TF,0,"وقد يكون التفاعل أيضًا بين عدة لاعبين."],
+["من المخاطر الجسدية للألعاب الإلكترونية:",["سرقة المعلومات","التنمر","آلام الظهر","الغضب"],2,"آلام الظهر والرقبة وجفاف العين وزيادة الوزن مخاطر جسدية."],
+["من سبل تجنب المخاطر الأمنية:",["اللعب لفترات طويلة","عدم مشاركة المعلومات الشخصية","مشاركة كلمة السر مع الأصدقاء","اللعب في الظلام"],1,"حافظ على بياناتك وفعّل إعدادات الخصوصية."],
+["أي العبارات التالية قاعدة آمنة للعب؟",["أن تلعب طوال اليوم","أن تشارك معلوماتك مع الجميع","أن تحدد لنفسك وقتًا محددًا للعب","أن تلعب ألعابًا عنيفة"],2,"تحديد وقت اللعب والالتزام به قاعدة مهمة."],
+["من المخاطر النفسية للألعاب الإلكترونية:",["تقوية الذاكرة","الشعور بالتوتر والعزلة","آلام الرقبة","زيادة الوزن"],1,"عندما يصبح اللعب أهم من كل شيء قد يؤثر على الدراسة والنوم."],
+["وصلك رابط من شخص غريب أثناء اللعب، ماذا تفعل؟",["تضغط عليه لترى","ترسله لأصدقائك","تتجاهله ولا تضغط عليه","تفتحه ثم تغلقه بسرعة"],2,"الروابط الغريبة قد تكون برامج ضارة تسرق المعلومات."],
+["لاعب يستخدم ألفاظًا غير لائقة ويتنمر عليك. ماذا تفعل؟",["ترد عليه بالمثل","لا ترد وتبلغ الأهل أو المسؤولين","تترك اللعبة وتخفي الأمر","تعطيه معلوماتك"],1,"لا ترد، وأبلغ الأهل أو المسؤولين عن اللعبة."],
+["ماذا نفعل لتجنب جفاف العين؟",["نقترب من الشاشة أكثر","ننظر بعيدًا عن الشاشة كل فترة","نلعب بلا توقف","نطفئ الإضاءة"],1,"خذ فترات راحة منتظمة وانظر بعيدًا."],
+["مع من يفضل أن تلعب عبر الإنترنت؟",["أي شخص","الغرباء","الأصدقاء والعائلة","من يطلب معلوماتك"],2,"العب مع من تعرفهم وفعّل الخصوصية."],
+["كيف تساعدك الأسرة على اللعب الآمن؟",["بوضع قواعد لوقت اللعب ونوعه","بترك اللعب بلا حدود","بالتجاهل التام","بشراء ألعاب أكثر"],0,"القواعد الواضحة والحوار المفتوح يحميانك."],
+["لا نستخدم الألعاب كوسيلة:",["للمتعة","للهروب من المشاكل","لقضاء وقت ممتع مع الأصدقاء","للتسلية بوقت محدد"],1,"المشاكل تُحل بالحوار مع الأهل، لا بالهروب."],
+["شعار الدرس: اللعب بمسؤولية =",["متعة + أمان + صحة","سرعة + فوز","وقت أطول","ألعاب أكثر"],0,"نكون أذكياء في اللعب ونحمي أنفسنا جسديًا وأمنيًا ونفسيًا."]
+];
+
+/* لوحة 30 مربعًا: السلالم والثعابين */
+const UP={4:[14,"استراحة للعين"],9:[18,"ممارسة الرياضة"],16:[26,"إبلاغ الأهل"],21:[28,"تحديد وقت اللعب"]};
+const DOWN={12:[3,"رابط غريب"],19:[8,"معلومات شخصية"],24:[15,"السهر في اللعب"],29:[22,"التنمر والغضب"]};
+const END=30;
+
+const $=id=>document.getElementById(id);
+let st={};
+let AC;
+function beep(f,d,t,v){try{AC=AC||new (window.AudioContext||window.webkitAudioContext)();const o=AC.createOscillator(),g=AC.createGain();o.type=t||"sine";o.frequency.value=f;g.gain.value=v||.15;o.connect(g);g.connect(AC.destination);o.start();g.gain.exponentialRampToValueAtTime(.001,AC.currentTime+d);o.stop(AC.currentTime+d)}catch(e){}}
+function seq(a){a.forEach((x,i)=>setTimeout(()=>beep(x[0],x[1],x[2]),i*130))}
+const sfx={roll:()=>seq([[300,.08,"square"],[380,.08,"square"],[460,.08,"square"]]),ok:()=>seq([[523,.15],[659,.15],[784,.25]]),no:()=>seq([[300,.2,"sawtooth"],[200,.3,"sawtooth"]]),win:()=>seq([[523,.15],[659,.15],[784,.15],[1047,.4]]),lose:()=>seq([[392,.25],[330,.25],[262,.5]])};
+
+function shuffle(a){a=a.slice();for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]]}return a}
+function getBest(){try{return +localStorage.getItem("sl_best")||0}catch(e){return 0}}
+function setBest(v){try{localStorage.setItem("sl_best",v)}catch(e){}}
+
+/* رسم اللوحة: الصف السفلي يبدأ من 1 */
+function drawBoard(){
+ const b=$("board");b.innerHTML="";
+ for(let r=4;r>=0;r--){
+  for(let c=0;c<6;c++){
+   const n=r*6+((r%2===0)?c+1:6-c);
+   const d=document.createElement("div");d.className="cell "+((r+c)%2?"b":"a");d.id="c"+n;
+   let h='<span class="n">'+n+'</span>';
+   if(UP[n]){d.classList.add("up");h+='<span class="t">🪜</span><small>'+UP[n][1]+'</small><small>إلى '+UP[n][0]+'</small>'}
+   else if(DOWN[n]){d.classList.add("down");h+='<span class="t">🐍</span><small>'+DOWN[n][1]+'</small><small>إلى '+DOWN[n][0]+'</small>'}
+   else if(n===END){d.classList.add("end");h+='<span class="t">🏆</span><small>النهاية</small>'}
+   else if(n===1){h+='<span class="t">🚩</span><small>البداية</small>'}
+   d.innerHTML=h;b.appendChild(d);
+  }
+ }
+}
+function place(){
+ document.querySelectorAll(".pawn").forEach(p=>p.remove());
+ document.querySelectorAll(".cur").forEach(p=>p.classList.remove("cur"));
+ const c=$("c"+st.pos);c.classList.add("cur");
+ const p=document.createElement("span");p.className="pawn";p.textContent="🧒";c.appendChild(p);
+}
+function hud(){$("sc").textContent=st.score;$("hr").textContent="❤️".repeat(st.hearts)+"🖤".repeat(3-st.hearts)}
+function say(t){$("msg").textContent=t}
+
+function start(){
+ const name=$("nm").value.trim()||"لاعب";
+ st={name,pos:1,hearts:3,score:0,right:0,asked:0,queue:shuffle(QS),busy:false};
+ $("who").textContent="👤 "+name;
+ $("start").classList.add("hidden");$("end").classList.add("hidden");$("game").classList.remove("hidden");
+ $("q").classList.add("hidden");$("roll").disabled=false;
+ drawBoard();place();hud();say("ارمِ النرد لتبدأ!");
+}
+function walk(to,cb){
+ const step=()=>{if(st.pos===to){cb();return}st.pos+=st.pos<to?1:-1;place();beep(440+st.pos*12,.06,"triangle",.08);setTimeout(step,170)};
+ step();
+}
+function roll(){
+ if(st.busy)return;st.busy=true;$("roll").disabled=true;sfx.roll();
+ let k=0;const iv=setInterval(()=>{$("dice").textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][Math.floor(Math.random()*6)];
+  if(++k>8){clearInterval(iv);const v=1+Math.floor(Math.random()*6);$("dice").textContent=["⚀","⚁","⚂","⚃","⚄","⚅"][v-1];
+   const to=Math.min(END,st.pos+v);say("خرج الرقم "+v);
+   walk(to,()=>{if(st.pos===END)finish(true);else ask()})}
+ },80);
+}
+function ask(){
+ if(!st.queue.length)st.queue=shuffle(QS);
+ const q=st.queue.pop();st.asked++;
+ $("qt").textContent=q[0];$("info").classList.add("hidden");$("nx").classList.add("hidden");
+ const box=$("qo");box.innerHTML="";
+ q[1].forEach((t,i)=>{const b=document.createElement("button");b.className="opt";b.textContent=t;b.onclick=()=>answer(i,q);box.appendChild(b)});
+ $("q").classList.remove("hidden");
+ const onUp=UP[st.pos],onDown=DOWN[st.pos];
+ say(onUp?"🪜 سلم! أجب صحيحًا لتصعد":onDown?"🐍 ثعبان! أجب صحيحًا لتنجو":"أجب عن السؤال");
+}
+function answer(i,q){
+ const opts=[...document.querySelectorAll(".opt")];opts.forEach(o=>o.disabled=true);
+ const ok=i===q[2];opts[q[2]].classList.add("ok");if(!ok)opts[i].classList.add("no");
+ const info=$("info");info.textContent=(ok?"إجابة صحيحة! ":"الإجابة الصحيحة موضحة بالأخضر. ")+q[3];info.classList.remove("hidden");
+ const nx=$("nx");nx.classList.remove("hidden");
+ let after;
+ if(ok){st.score+=10;st.right++;sfx.ok();after=UP[st.pos]?()=>jump(UP[st.pos][0]):done}
+ else{st.hearts--;sfx.no();
+  after=DOWN[st.pos]?()=>jump(DOWN[st.pos][0]):()=>{if(st.hearts>0&&st.pos>1)jump(st.pos-1);else done()}}
+ hud();
+ nx.onclick=()=>{$("q").classList.add("hidden");nx.onclick=null;if(st.hearts<=0){finish(false);return}after()};
+}
+function jump(to){say(to>st.pos?"صعدت السلم! 🎉":"نزلت إلى الأسفل!");walk(to,done)}
+function done(){st.busy=false;$("roll").disabled=false;say("ارمِ النرد")}
+function finish(win){
+ if(win){st.score+=20+st.hearts*10;sfx.win()}else sfx.lose();
+ $("game").classList.add("hidden");$("end").classList.remove("hidden");
+ $("et").textContent=win?"🏆 أحسنت يا "+st.name+"! وصلت إلى النهاية":"💔 انتهت القلوب يا "+st.name+"، حاول مرة أخرى";
+ $("e1").textContent=st.score;$("e2").textContent=st.right;$("e3").textContent=st.asked;
+ const b=getBest();let t="أفضل نتيجة: "+Math.max(b,st.score);
+ if(st.score>b){setBest(st.score);t="🌟 رقم قياسي جديد! "+st.score}
+ $("eb").textContent=t;
+}
+$("go").onclick=start;$("again").onclick=()=>{$("end").classList.add("hidden");$("start").classList.remove("hidden");showBest()};
+$("roll").onclick=roll;$("nm").addEventListener("keydown",e=>{if(e.key==="Enter")start()});
+function showBest(){const b=getBest();$("best").textContent=b?"أفضل نتيجة على هذا الجهاز: "+b:""}
+showBest();
+</script>
+</body>
+</html>
